@@ -27,6 +27,7 @@ type gamestate struct {
 	Projectiles map[uint32]*dataProjectile `json:"projectile"` //spelar ingen roll vem som sköt projektilen, bara att de finns
 	ID          uint32                     `json:"id"`         //för objekt utan tillhörande, ie projektiler
 	Frame       int                        `json:"frame"`
+	UniqueID    uint32                     `json:"uniqueid"` //only read by the connecter upon first communication, should allow for client side identification
 }
 
 // Terrain
@@ -56,6 +57,7 @@ type dataTank struct {
 	Dir       int     `json:"dir"`
 	LastFire  int     `json:"lastfire"`
 	LastJump  int     `json:"lastjump"`
+	Alive     bool    `json:"alive"`
 }
 
 // dataProjectile holds all data for any given projectile
@@ -171,6 +173,7 @@ func initTank(team string, terrain map[int]*terrain) *dataTank {
 		Hp:        100,
 		Team:      team,
 		Dir:       1,
+		Alive:     true,
 	}
 }
 
@@ -181,6 +184,7 @@ func initGamestate() *gamestate {
 		Projectiles: make(map[uint32]*dataProjectile),
 		ID:          0,
 		Frame:       0,
+		UniqueID:    0,
 	}
 }
 
@@ -213,10 +217,7 @@ func calculateExplosion(x int, y int, radius int, gamestate *gamestate) {
 	for i, tank := range gamestate.Tanks {
 		dist := math.Sqrt((float64(x)-tank.X)*(float64(x)-tank.X) + (float64(y)-tank.Y)*(float64(y)-tank.Y))
 		if dist < float64(radius) {
-			fmt.Println(dist)
-			fmt.Println(gamestate.Tanks[i].Hp)
 			changeHP(int(-float64(maxExplosionDmg)/(math.Sqrt(dist/float64(radius))+1)), gamestate.Tanks[i])
-			fmt.Println(gamestate.Tanks[i].Hp)
 		}
 	}
 	xMid := x
@@ -228,7 +229,7 @@ func calculateExplosion(x int, y int, radius int, gamestate *gamestate) {
 	ySave := gamestate.Terrain[xCurrent].Y
 	for xCurrent <= xEnd {
 		distFromExp := math.Abs(float64(xCurrent - xMid))
-		yPot := math.Sqrt(float64(-int(distFromExp*distFromExp)+radius*radius)) + float64(y) - 20 // seems to be a good ofset
+		yPot := math.Sqrt(float64(-int(distFromExp*distFromExp)+radius*radius)) + float64(y) - 20 // seems to be a good offset
 		if !(int(mapSize) > xCurrent && xCurrent > 0) {
 
 		} else if gamestate.Terrain[xCurrent].Y < yPot {
@@ -250,11 +251,13 @@ func calculateExplosion(x int, y int, radius int, gamestate *gamestate) {
 
 func changeHP(change int, tank *dataTank) {
 	tank.Hp += change
-	if tank.Hp < 0 {
-		tank.Hp = 0
+	if tank.Hp <= 0 {
+		tank.Alive = false
+		fmt.Print("tank alive set to false")
 	}
 	if tank.Hp > 100 {
 		tank.Hp = 100
+		fmt.Print("???")
 	}
 }
 

@@ -99,6 +99,7 @@ func acceptConnections(ln *net.Listener, s *Server) {
 		clientLock.Lock()
 		s.clients[client] = s.clientID // Add to map of clients
 		clientLock.Unlock()
+		s.gamestate.UniqueID = s.clientID
 		tankLock.Lock()
 		addTank(s.gamestate, s.clientID, "red") //Marcus - alla börjar som RED nu, bör vara ett val att när man som client startar att få välja vilket team man ska vara
 		tankLock.Unlock()
@@ -125,7 +126,7 @@ func listenToClient(client Client, s *Server) {
 	for {
 		message, err := bufio.NewReader(client.conn).ReadString('\n')
 		if err != nil {
-			log.Print("connection dead, ending goroutine")
+			log.Print("connection disconnected, ending goroutine")
 			tankLock.Lock()
 			delete(s.gamestate.Tanks, s.clients[client])
 			tankLock.Unlock()

@@ -144,6 +144,13 @@ def redrawGameWindow(gamestate):
     :return: Draws the game graphics
     """
     global index
+    global alive
+    global uniqueID
+
+    #print(gamestate["tanks"])
+    if gamestate["tanks"][uniqueID]["alive"] == False:
+        alive = False
+
     win.blit(chosenBackground, (0, 0))
     projectiles = gamestate["projectile"]
     projList = []
@@ -193,11 +200,14 @@ def redrawGameWindow(gamestate):
     pygame.display.update()
 
 def connect(HOST, PORT, BUFFER, socket): #Rasmus - Kan lägga till IP här efter behov
+    global uniqueID
     socket.connect((HOST, PORT))
     print("successful connect")
     jsonStr = socket.recv(BUFFER)
     #print(jsonStr)
     gamestate = json.loads(jsonStr.decode('utf-8'))
+    uniqueID = str(gamestate["uniqueid"])
+    print(uniqueID)
     redrawGameWindow(gamestate)
     socket.setblocking(0)
     return gamestate
@@ -207,6 +217,8 @@ def gameLoop():
     global health
     global jumpIndex
     global input_box1
+    global uniqueID
+    global alive
     choose = False
     ticks_elapsed = 0
     #fade(1200,700)
@@ -215,6 +227,7 @@ def gameLoop():
         gamestate = connect(input_box1.text, 8080, BUFFER_SIZE, s)
         ticks_elapsed = 0
         run = True
+        alive = True
         """ main game loop
         """
         while run:
@@ -229,20 +242,22 @@ def gameLoop():
 
             keys = pygame.key.get_pressed()
             str = ""
-            if keys[pygame.K_d]: #drive left
-                str += "0,"
-            elif keys[pygame.K_a]: #drive right
-                str += "1,"
-            if keys[pygame.K_w]: #jump
-                str += "4,"
-            if  keys[pygame.K_LEFT]: #rotate barrel left
-                str += "2,"
-            elif keys[pygame.K_RIGHT]: #rotate barrel right
-                str += "3,"
-            if keys[pygame.K_SPACE]: #shoot
-                str += "6,"
-            elif keys[pygame.K_k] and health > 0: #currently useless
-                health -= 25
+            if alive:
+                if keys[pygame.K_d]: #drive left
+                    str += "0,"
+                elif keys[pygame.K_a]: #drive right
+                    str += "1,"
+                if keys[pygame.K_w]: #jump
+                    str += "4,"
+                if  keys[pygame.K_LEFT]: #rotate barrel left
+                    str += "2,"
+                elif keys[pygame.K_RIGHT]: #rotate barrel right
+                    str += "3,"
+                if keys[pygame.K_SPACE]: #shoot
+                    str += "6,"
+                    print(uniqueID)
+                elif keys[pygame.K_k] and health > 0: #currently useless
+                    health -= 25
             if str != "":
                 str = str.rstrip(',') # remove trailing comma
                 str += "\n" # tells golang channels when the message is done
