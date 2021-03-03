@@ -1,0 +1,32 @@
+_Prio_
+
+Fix relative paths to resources - done? needs testing
+
+Make sure you can input multiple commands at once, looks like only one thing at a time is working currently - now works, testing would be good. strategy for now seems sufficient
+
+Fix barrel so that it is relative to the tank instead of the map - done, easy fix
+
+Add some kind of death mechanic
+
+Try to smooth movement along ground, both up and downhill. Make sure acceleration isn't too crazy
+
+Make random maps have slightly steep slopes, maybe make random maps an option and have some premade ones available
+
+Make a menu for leaving games/give players the option to restart every round
+
+Make 
+
+
+_Future_
+
+Add a slightly random wind element to projectiles 
+
+Add screen indicator for cooldowns and wind
+
+Future power-ups?
+
+Either make the screen slightly larger or make tanks slightly smaller to better facilitate 4 or more players
+
+Write some tests for back-end and investigate how many requests the server can handle (ie is the server able to process 1 request every tick from 4 players, are any sends lost etc)
+
+Try to improve performance in general!

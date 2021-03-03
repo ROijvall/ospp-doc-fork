@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -23,13 +22,13 @@ type Server struct {
 // Client is needed for having a goroutine listening to client and updating a channel
 type Client struct {
 	conn net.Conn
-	ch   chan int
+	ch   chan string
 }
 
 func createClient(conn net.Conn) Client {
 	return Client{
 		conn: conn,
-		ch:   make(chan int),
+		ch:   make(chan string),
 	}
 }
 
@@ -48,16 +47,24 @@ var projLock = sync.RWMutex{}
 var tankLock = sync.RWMutex{}
 var clientLock = sync.RWMutex{}
 
+func lockAllGamestate() {
+	terrainLock.Lock()
+	tankLock.Lock()
+	projLock.Lock()
+}
+
+func unlockAllGamestate() {
+	terrainLock.Unlock()
+	tankLock.Unlock()
+	projLock.Unlock()
+}
+
 // handleMessages will send the current gamestate to every connected client as JSON
-func handleMessages(s *Server) {
+func broadcastState(s *Server) {
 	// make gamestate into JSON
-	terrainLock.RLock()
-	tankLock.RLock()
-	projLock.RLock()
+	lockAllGamestate()
 	newmsg, err := json.Marshal(*(s.gamestate))
-	terrainLock.RUnlock()
-	tankLock.RUnlock()
-	projLock.RUnlock()
+	unlockAllGamestate()
 	if err != nil {
 		log.Print(err)
 	}
@@ -85,6 +92,9 @@ func handleConnections(client Client, s *Server, wg *sync.WaitGroup) {
 func acceptConnections(ln *net.Listener, s *Server) {
 	for {
 		conn, _ := (*ln).Accept()
+		if len(s.clients) == 0 {
+			initTerrain(s.gamestate)
+		}
 		client := createClient(conn) // Saves connection and adds a channel for clients to broadcast to
 		clientLock.Lock()
 		s.clients[client] = s.clientID // Add to map of clients
@@ -94,13 +104,9 @@ func acceptConnections(ln *net.Listener, s *Server) {
 		tankLock.Unlock()
 		s.clientID++
 		go listenToClient(client, s)
-		terrainLock.RLock()
-		tankLock.RLock()
-		projLock.RLock()
+		lockAllGamestate()
 		newmsg, err := json.Marshal(*(s.gamestate))
-		terrainLock.RUnlock()
-		tankLock.RUnlock()
-		projLock.RUnlock()
+		unlockAllGamestate()
 		if err != nil {
 			log.Print(err)
 		}
@@ -126,14 +132,17 @@ func listenToClient(client Client, s *Server) {
 			clientLock.Lock()
 			delete(s.clients, client)
 			clientLock.Unlock()
+			if len(s.clients) == 0 {
+				s.gamestate = initGamestate()
+			}
 			return
 		}
 		message = strings.TrimRight(message, "\r\n")
-		intmsg, err := strconv.Atoi(message)
+		//intmsg, err := strconv.Atoi(message)
 		if err != nil {
 			log.Println(err)
 		}
-		client.ch <- intmsg
+		client.ch <- message
 	}
 }
 
@@ -141,7 +150,7 @@ func main() {
 
 	fmt.Println("Launching server...")
 	s := initServer()
-	initTerrain(s.gamestate)
+	//initTerrain(s.gamestate)
 	t := time.NewTicker(50 * time.Millisecond)
 	var wg sync.WaitGroup
 	defer t.Stop()
@@ -164,7 +173,8 @@ func main() {
 			go handleConnections(client, s, &wg)
 		}
 		wg.Wait()
-		go handleMessages(s)
-
+		if len(s.clients) > 0 {
+			go broadcastState(s)
+		}
 	}
 }

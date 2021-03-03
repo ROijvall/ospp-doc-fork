@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -84,41 +86,38 @@ func initTerrain(game *gamestate) {
 	rand.Seed(time.Now().UnixNano())
 	x := 0
 
-
-	y := rand.Float64()*heightOfMap
+	y := rand.Float64() * heightOfMap
 	//standardTerrain := y
 	var dy float64 = 0
 	var dyGoal float64 = 0
 	var curveDensity float64 = 0
 
-
 	for x < int(mapSize) {
 		if curveDensity == 0 {
-			dyGoal = 0.5*(-0.5 + rand.Float64())
+			dyGoal = 0.5 * (-0.5 + rand.Float64())
 			curveDensity = 30
 		}
-		dy += dyGoal/30
+		dy += dyGoal / 30
 		y += dy
 		game.Terrain[x] = genTerrain(x, int(y))
 		fmt.Println(game.Terrain[x].Y)
 		curveDensity--
 		x++
-		if y > heightOfMap - 200{
+		if y > heightOfMap-200 {
 			dy -= 0.02
 		}
-		if y > heightOfMap - 100{
+		if y > heightOfMap-100 {
 			dyGoal = -0.5
 			dy -= 0.05
 		}
 
-		if y < reactionHeight + 100{
+		if y < reactionHeight+100 {
 			dy += 0.01
 		}
 		if y < reactionHeight {
 			dyGoal = 0.5
 			dy += 0.05
 		}
-
 
 	}
 
@@ -195,8 +194,8 @@ func addProjectile(gamestate *gamestate, tank *dataTank) {
 	projectile := &dataProjectile{
 		X:         tank.X,
 		Y:         tank.Y + 1, // 1 to hinder it from hitting the ground directly after firing
-		YVelocity: math.Sin(-(tank.DegCannon * 0.0174532925)) * firePower,
-		XVelocity: math.Cos(-(tank.DegCannon * 0.0174532925)) * firePower,
+		YVelocity: math.Sin(-((tank.DegCannon - tank.DegTank) * 0.0174532925)) * firePower,
+		XVelocity: math.Cos(-((tank.DegCannon - tank.DegTank) * 0.0174532925)) * firePower,
 		A:         tank.DegCannon,
 		V0:        100,
 		T:         1,
@@ -352,78 +351,83 @@ func tanksXVelocity(gamestate *gamestate, tanks map[uint32]*dataTank) {
 }
 
 //handleInput is the only function that is called through the Server and will change gamestate according to input
-func handleInput(x int, tank *dataTank, gamestate *gamestate) {
-	switch x {
-	case 0:
-		if tank.X < mapSize-(maxVelocity+1) && tank.Y >= gamestate.Terrain[int(tank.X)].Y {
-			tankLock.Lock()
-			if calculateCollision(tank, gamestate.Tanks) == false {
-				if tank.XVelocity < maxVelocity {
-					if tank.XVelocity < 0 {
-						tank.XVelocity = 0
+func handleInput(input string, tank *dataTank, gamestate *gamestate) {
+	if input != "" {
+		inputs := strings.Split(input, ",") // every command is split into a single string which are then processed one by one
+		for _, x := range inputs {
+			y, _ := strconv.Atoi(x) // might not be entirely necessary
+			switch y {
+			case 0:
+				if tank.X < mapSize-(maxVelocity+1) && tank.Y >= gamestate.Terrain[int(tank.X)].Y {
+					tankLock.Lock()
+					if calculateCollision(tank, gamestate.Tanks) == false {
+						if tank.XVelocity < maxVelocity {
+							if tank.XVelocity < 0 {
+								tank.XVelocity = 0
+							}
+							tank.XVelocity += 1
+							tank.Y = gamestate.Terrain[int(tank.X)].Y
+						}
 					}
-					tank.XVelocity += 1
-					tank.Y = gamestate.Terrain[int(tank.X)].Y
+					tankLock.Unlock()
 				}
-			}
-			tankLock.Unlock()
-		}
-	case 1:
-		if tank.X > 0 && tank.Y >= gamestate.Terrain[int(tank.X)].Y {
-			tankLock.Lock()
-			if calculateCollision(tank, gamestate.Tanks) == false {
-				if tank.XVelocity > -maxVelocity {
-					if tank.XVelocity > 0 {
-						tank.XVelocity = 0
+			case 1:
+				if tank.X > 0 && tank.Y >= gamestate.Terrain[int(tank.X)].Y {
+					tankLock.Lock()
+					if calculateCollision(tank, gamestate.Tanks) == false {
+						if tank.XVelocity > -maxVelocity {
+							if tank.XVelocity > 0 {
+								tank.XVelocity = 0
+							}
+							tank.XVelocity -= 1
+							tank.Y = gamestate.Terrain[int(tank.X)].Y
+						}
 					}
-					tank.XVelocity -= 1
-					tank.Y = gamestate.Terrain[int(tank.X)].Y
+					tankLock.Unlock()
 				}
+			case 2:
+				if 0 <= tank.DegCannon && tank.DegCannon < 180 {
+					tankLock.Lock()
+					tank.DegCannon++
+					tankLock.Unlock()
+				}
+			case 3:
+				if 0 < tank.DegCannon && tank.DegCannon <= 180 {
+					tankLock.Lock()
+					tank.DegCannon--
+					tankLock.Unlock()
+				}
+			case 4: //Jump
+				tankLock.Lock()
+				tankJump(tank, gamestate)
+				tankLock.Unlock()
+			case 6:
+				if gamestate.Frame > tank.LastFire+20 {
+					tank.LastFire = gamestate.Frame
+					addProjectile(gamestate, tank)
+				}
+
+			// Cases 100+ are only for testing, will not be used in the game!
+			case 100:
+				if 0 <= tank.DegTank && tank.DegTank < 180 {
+					tank.DegTank++
+				}
+			case 101:
+				if 0 < tank.DegTank && tank.DegTank <= 180 {
+					tank.DegTank--
+				}
+			case 102:
+				calcDeg(gamestate, gamestate.Tanks)
+			case 103:
+				tank.X = float64(18)
+				tank.Y = gamestate.Terrain[int(tank.X)].Y
+			case 104:
+				tank.Y++
+			case 105:
+				tank.Y--
+			default:
+				fmt.Println("Invalid input" + x)
 			}
-			tankLock.Unlock()
 		}
-	case 2:
-		if 0 <= tank.DegCannon && tank.DegCannon < 180 {
-			tankLock.Lock()
-			tank.DegCannon++
-			tankLock.Unlock()
-		}
-	case 3:
-		if 0 < tank.DegCannon && tank.DegCannon <= 180 {
-			tankLock.Lock()
-			tank.DegCannon--
-			tankLock.Unlock()
-		}
-	case 4: //Jump
-		tankLock.Lock()
-		tankJump(tank, gamestate)
-		tankLock.Unlock()
-	case 6:
-		if gamestate.Frame > tank.LastFire+20 {
-			tank.LastFire = gamestate.Frame
-			addProjectile(gamestate, tank)
-		}
-
-	// Cases 100+ are only for testing, will not be used in the game!
-	case 100:
-		if 0 <= tank.DegTank && tank.DegTank < 180 {
-			tank.DegTank++
-		}
-	case 101:
-		if 0 < tank.DegTank && tank.DegTank <= 180 {
-			tank.DegTank--
-		}
-	case 102:
-		calcDeg(gamestate, gamestate.Tanks)
-	case 103:
-		tank.X = float64(18)
-		tank.Y = gamestate.Terrain[int(tank.X)].Y
-	case 104:
-		tank.Y++
-	case 105:
-		tank.Y--
-
-	default:
-		fmt.Println("Invalid input")
 	}
 }

@@ -60,7 +60,7 @@ class Tank(object):
         self.xCannon = self.x
         self.yCannon = self.y - 2
         oldRect = rs.pipe.get_rect(center=(self.xCannon, self.yCannon))
-        rotatedPipe, newRect = rotate(rs.pipe, oldRect, self.degCannon)
+        rotatedPipe, newRect = rotate(rs.pipe, oldRect, self.degCannon-self.degTank)
         win.blit(rotatedPipe, newRect)
 
 

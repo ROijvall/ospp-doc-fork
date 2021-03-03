@@ -228,27 +228,25 @@ def gameLoop():
                     run = False
 
             keys = pygame.key.get_pressed()
-
-            if keys[pygame.K_w]:
-                str = "4\n"
-                s.sendall(str.encode())
-            elif keys[pygame.K_d]:
-                str = "0\n"
-                s.sendall(str.encode())
-            elif keys[pygame.K_a]:
-                str = "1\n"
-                s.sendall(str.encode())
-            elif keys[pygame.K_LEFT]:
-                str = "2\n"
-                s.sendall(str.encode())
-            elif keys[pygame.K_RIGHT]:
-                str = "3\n"
-                s.sendall(str.encode())
-            elif keys[pygame.K_SPACE]:
-                str = "6\n"
-                s.sendall(str.encode())
-            elif keys[pygame.K_k] and health > 0:
+            str = ""
+            if keys[pygame.K_d]: #drive left
+                str += "0,"
+            elif keys[pygame.K_a]: #drive right
+                str += "1,"
+            if keys[pygame.K_w]: #jump
+                str += "4,"
+            if  keys[pygame.K_LEFT]: #rotate barrel left
+                str += "2,"
+            elif keys[pygame.K_RIGHT]: #rotate barrel right
+                str += "3,"
+            if keys[pygame.K_SPACE]: #shoot
+                str += "6,"
+            elif keys[pygame.K_k] and health > 0: #currently useless
                 health -= 25
+            if str != "":
+                str = str.rstrip(',') # remove trailing comma
+                str += "\n" # tells golang channels when the message is done
+                s.sendall(str.encode())
 
             try:
                 jsonData = s.recv(BUFFER_SIZE)
