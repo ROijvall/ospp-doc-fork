@@ -27,6 +27,8 @@ type gamestate struct {
 	Projectiles map[uint32]*dataProjectile `json:"projectile"` //spelar ingen roll vem som sköt projektilen, bara att de finns
 	ID          uint32                     `json:"id"`         //för objekt utan tillhörande, ie projektiler
 	Frame       int                        `json:"frame"`
+	UniqueID    uint32                     `json:"uniqueid"`   //only read by the connecter upon first communication, should allow for client side identification
+	AliveTanks  int                        `json:"alivetanks"` //maybe this can be solved by removing tanks from gamestate instead?
 }
 
 // Terrain
@@ -56,6 +58,7 @@ type dataTank struct {
 	Dir       int     `json:"dir"`
 	LastFire  int     `json:"lastfire"`
 	LastJump  int     `json:"lastjump"`
+	Alive     bool    `json:"alive"`
 }
 
 // dataProjectile holds all data for any given projectile
@@ -100,7 +103,6 @@ func initTerrain(game *gamestate) {
 		dy += dyGoal / 30
 		y += dy
 		game.Terrain[x] = genTerrain(x, int(y))
-		fmt.Println(game.Terrain[x].Y)
 		curveDensity--
 		x++
 		if y > heightOfMap-200 {
@@ -171,6 +173,7 @@ func initTank(team string, terrain map[int]*terrain) *dataTank {
 		Hp:        100,
 		Team:      team,
 		Dir:       1,
+		Alive:     true,
 	}
 }
 
@@ -181,12 +184,14 @@ func initGamestate() *gamestate {
 		Projectiles: make(map[uint32]*dataProjectile),
 		ID:          0,
 		Frame:       0,
+		UniqueID:    0,
 	}
 }
 
 // Adds a new tank to a given gamestate
 func addTank(gamestate *gamestate, client uint32, team string) {
 	gamestate.Tanks[client] = initTank(team, gamestate.Terrain)
+	gamestate.AliveTanks++
 }
 
 // addProjectile adds a new projectile to a given gamestate according to a given tank
@@ -213,10 +218,7 @@ func calculateExplosion(x int, y int, radius int, gamestate *gamestate) {
 	for i, tank := range gamestate.Tanks {
 		dist := math.Sqrt((float64(x)-tank.X)*(float64(x)-tank.X) + (float64(y)-tank.Y)*(float64(y)-tank.Y))
 		if dist < float64(radius) {
-			fmt.Println(dist)
-			fmt.Println(gamestate.Tanks[i].Hp)
-			changeHP(int(-float64(maxExplosionDmg)/(math.Sqrt(dist/float64(radius))+1)), gamestate.Tanks[i])
-			fmt.Println(gamestate.Tanks[i].Hp)
+			changeHP(int(-float64(maxExplosionDmg)/(math.Sqrt(dist/float64(radius))+1)), gamestate.Tanks[i], gamestate)
 		}
 	}
 	xMid := x
@@ -228,7 +230,7 @@ func calculateExplosion(x int, y int, radius int, gamestate *gamestate) {
 	ySave := gamestate.Terrain[xCurrent].Y
 	for xCurrent <= xEnd {
 		distFromExp := math.Abs(float64(xCurrent - xMid))
-		yPot := math.Sqrt(float64(-int(distFromExp*distFromExp)+radius*radius)) + float64(y) - 20 // seems to be a good ofset
+		yPot := math.Sqrt(float64(-int(distFromExp*distFromExp)+radius*radius)) + float64(y) - 20 // seems to be a good offset
 		if !(int(mapSize) > xCurrent && xCurrent > 0) {
 
 		} else if gamestate.Terrain[xCurrent].Y < yPot {
@@ -248,13 +250,16 @@ func calculateExplosion(x int, y int, radius int, gamestate *gamestate) {
 	}
 }
 
-func changeHP(change int, tank *dataTank) {
+func changeHP(change int, tank *dataTank, gamestate *gamestate) {
 	tank.Hp += change
-	if tank.Hp < 0 {
-		tank.Hp = 0
+	if tank.Hp <= 0 {
+		tank.Alive = false
+		gamestate.AliveTanks--
+		fmt.Print("tank alive set to false")
 	}
 	if tank.Hp > 100 {
 		tank.Hp = 100
+		fmt.Print("???")
 	}
 }
 
@@ -406,7 +411,11 @@ func handleInput(input string, tank *dataTank, gamestate *gamestate) {
 					tank.LastFire = gamestate.Frame
 					addProjectile(gamestate, tank)
 				}
-
+			case 9:
+				tankLock.Lock()
+				fmt.Println("hp -100?")
+				changeHP(-100, tank, gamestate)
+				tankLock.Unlock()
 			// Cases 100+ are only for testing, will not be used in the game!
 			case 100:
 				if 0 <= tank.DegTank && tank.DegTank < 180 {
