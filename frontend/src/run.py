@@ -148,7 +148,7 @@ def redrawGameWindow(gamestate):
     global uniqueID
 
     #print(gamestate["tanks"])
-    if gamestate["tanks"][uniqueID]["alive"] == False:
+    if gamestate["tanks"][str(uniqueID)]["alive"] == False:
         alive = False
 
     win.blit(chosenBackground, (0, 0))
@@ -206,7 +206,7 @@ def connect(HOST, PORT, BUFFER, socket): #Rasmus - Kan lägga till IP här efter
     jsonStr = socket.recv(BUFFER)
     #print(jsonStr)
     gamestate = json.loads(jsonStr.decode('utf-8'))
-    uniqueID = str(gamestate["uniqueid"])
+    uniqueID = gamestate["uniqueid"]
     print(uniqueID)
     redrawGameWindow(gamestate)
     socket.setblocking(0)
@@ -255,9 +255,13 @@ def gameLoop():
                     str += "3,"
                 if keys[pygame.K_SPACE]: #shoot
                     str += "6,"
-                    print(uniqueID)
                 elif keys[pygame.K_k] and health > 0: #currently useless
                     health -= 25
+                if keys[pygame.K_m]:
+                    print("hey i'm alive?")
+                if keys[pygame.K_p]:
+                    str += "9,"
+                    print("sent death")
             if str != "":
                 str = str.rstrip(',') # remove trailing comma
                 str += "\n" # tells golang channels when the message is done

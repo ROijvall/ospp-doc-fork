@@ -21,12 +21,14 @@ type Server struct {
 
 // Client is needed for having a goroutine listening to client and updating a channel
 type Client struct {
+	id   uint32
 	conn net.Conn
 	ch   chan string
 }
 
-func createClient(conn net.Conn) Client {
+func createClient(conn net.Conn, id uint32) Client {
 	return Client{
+		id:   id,
 		conn: conn,
 		ch:   make(chan string),
 	}
@@ -95,7 +97,7 @@ func acceptConnections(ln *net.Listener, s *Server) {
 		if len(s.clients) == 0 {
 			initTerrain(s.gamestate)
 		}
-		client := createClient(conn) // Saves connection and adds a channel for clients to broadcast to
+		client := createClient(conn, s.clientID) // Saves connection and adds a channel for clients to broadcast to
 		clientLock.Lock()
 		s.clients[client] = s.clientID // Add to map of clients
 		clientLock.Unlock()
@@ -147,6 +149,15 @@ func listenToClient(client Client, s *Server) {
 	}
 }
 
+func gameRestart(s *Server) {
+	fmt.Println("attempting restart")
+	s.gamestate = initGamestate()
+	initTerrain(s.gamestate)
+	for client := range s.clients {
+		addTank(s.gamestate, client.id, "red")
+	}
+}
+
 func main() {
 
 	fmt.Println("Launching server...")
@@ -174,6 +185,12 @@ func main() {
 			go handleConnections(client, s, &wg)
 		}
 		wg.Wait()
+		if len(s.clients) > 1 && s.gamestate.AliveTanks == 1 {
+			gameRestart(s)
+		}
+		if len(s.clients) == 1 && s.gamestate.AliveTanks == 0 {
+			gameRestart(s)
+		}
 		if len(s.clients) > 0 {
 			go broadcastState(s)
 		}

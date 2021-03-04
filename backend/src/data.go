@@ -27,7 +27,8 @@ type gamestate struct {
 	Projectiles map[uint32]*dataProjectile `json:"projectile"` //spelar ingen roll vem som sköt projektilen, bara att de finns
 	ID          uint32                     `json:"id"`         //för objekt utan tillhörande, ie projektiler
 	Frame       int                        `json:"frame"`
-	UniqueID    uint32                     `json:"uniqueid"` //only read by the connecter upon first communication, should allow for client side identification
+	UniqueID    uint32                     `json:"uniqueid"`   //only read by the connecter upon first communication, should allow for client side identification
+	AliveTanks  int                        `json:"alivetanks"` //maybe this can be solved by removing tanks from gamestate instead?
 }
 
 // Terrain
@@ -102,7 +103,6 @@ func initTerrain(game *gamestate) {
 		dy += dyGoal / 30
 		y += dy
 		game.Terrain[x] = genTerrain(x, int(y))
-		fmt.Println(game.Terrain[x].Y)
 		curveDensity--
 		x++
 		if y > heightOfMap-200 {
@@ -191,6 +191,7 @@ func initGamestate() *gamestate {
 // Adds a new tank to a given gamestate
 func addTank(gamestate *gamestate, client uint32, team string) {
 	gamestate.Tanks[client] = initTank(team, gamestate.Terrain)
+	gamestate.AliveTanks++
 }
 
 // addProjectile adds a new projectile to a given gamestate according to a given tank
@@ -217,7 +218,7 @@ func calculateExplosion(x int, y int, radius int, gamestate *gamestate) {
 	for i, tank := range gamestate.Tanks {
 		dist := math.Sqrt((float64(x)-tank.X)*(float64(x)-tank.X) + (float64(y)-tank.Y)*(float64(y)-tank.Y))
 		if dist < float64(radius) {
-			changeHP(int(-float64(maxExplosionDmg)/(math.Sqrt(dist/float64(radius))+1)), gamestate.Tanks[i])
+			changeHP(int(-float64(maxExplosionDmg)/(math.Sqrt(dist/float64(radius))+1)), gamestate.Tanks[i], gamestate)
 		}
 	}
 	xMid := x
@@ -249,10 +250,11 @@ func calculateExplosion(x int, y int, radius int, gamestate *gamestate) {
 	}
 }
 
-func changeHP(change int, tank *dataTank) {
+func changeHP(change int, tank *dataTank, gamestate *gamestate) {
 	tank.Hp += change
 	if tank.Hp <= 0 {
 		tank.Alive = false
+		gamestate.AliveTanks--
 		fmt.Print("tank alive set to false")
 	}
 	if tank.Hp > 100 {
@@ -409,7 +411,11 @@ func handleInput(input string, tank *dataTank, gamestate *gamestate) {
 					tank.LastFire = gamestate.Frame
 					addProjectile(gamestate, tank)
 				}
-
+			case 9:
+				tankLock.Lock()
+				fmt.Println("hp -100?")
+				changeHP(-100, tank, gamestate)
+				tankLock.Unlock()
 			// Cases 100+ are only for testing, will not be used in the game!
 			case 100:
 				if 0 <= tank.DegTank && tank.DegTank < 180 {
