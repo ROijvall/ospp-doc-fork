@@ -6,11 +6,13 @@ Make sure you can input multiple commands at once, looks like only one thing at 
 
 Fix barrel so that it is relative to the tank instead of the map - done, easy fix
 
-Add some kind of death mechanic
+Add some kind of death mechanic - done, can be improved
+
+Make random maps have slightly steep slopes, maybe make random maps an option and have some premade ones available - maps now more slopelike, maybe it would be nice to have both options
 
 Try to smooth movement along ground, both up and downhill. Make sure acceleration isn't too crazy
 
-Make random maps have slightly steep slopes, maybe make random maps an option and have some premade ones available
+
 
 Make a menu for leaving games/give players the option to restart every round.
 

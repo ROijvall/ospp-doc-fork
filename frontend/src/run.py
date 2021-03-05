@@ -30,7 +30,7 @@ win = pygame.display.set_mode((winX, winY))
 pygame.display.set_caption("Super-Tanks")
 tankCounter = 0
 winX = 1200
-winY = 700
+winY = 800
 health = 100
 menu = True
 choose = True
@@ -43,7 +43,6 @@ index = 0
 
 jumpFX = spritehandler.Spritesheet(rs.jump, 6, 5)
 jumpIndex = 1
-yo = 4
 
 def mainMenu():
     """ The drawing function of the main menu
@@ -130,7 +129,6 @@ def fade(width, height):
 
 def jumping():
     global jumpIndex
-    global yo
     if jumpIndex < 26:
         jumpFX.draw(win, index % jumpFX.totalCellCount, 200, 200)
         jumpIndex += 1

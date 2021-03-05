@@ -178,7 +178,7 @@ func main() {
 		s.gamestate.Frame++
 		go calculateProjectiles(s.gamestate)
 		go tanksJump(s.gamestate)
-		go tanksXVelocity(s.gamestate, s.gamestate.Tanks)
+		go tanksXMovement(s.gamestate, s.gamestate.Tanks)
 		go calcDeg(s.gamestate, s.gamestate.Tanks)
 		for client := range s.clients {
 			wg.Add(1)

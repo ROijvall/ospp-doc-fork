@@ -16,7 +16,7 @@ const rad2deg float64 = 57.2957795 // Used in calcDeg
 const firePower float64 = 20       // FIXME : Adjust this value to fit gamebalance
 const explosionSize int = 50
 const maxExplosionDmg int = 50
-const maxVelocity float64 = 5
+const maxVelocity float64 = 4
 const jumpPower float64 = 9 // Bigger number = Bigger jump
 const reactionHeight float64 = 350
 const jumpCooldown int = 100 // amount of frames between jumps
@@ -336,29 +336,23 @@ func calculateCollision(playingTank *dataTank, tanks map[uint32]*dataTank) bool 
 	return false
 }
 
-func tanksXVelocity(gamestate *gamestate, tanks map[uint32]*dataTank) {
+func tanksXMovement(gamestate *gamestate, tanks map[uint32]*dataTank) {
+	slopeConst := 3 * maxVelocity // this makes sense because slopes are capped at 0.33 gradient
 	for _, tank := range tanks {
+		potentialMove := gamestate.Terrain[int(tank.X+tank.XVelocity)].Y
+		yDiff := potentialMove - tank.Y
+		a := yDiff / slopeConst // should range between -0.33-0.33, more speed > larger penalty when climbing a slope
 		if tank.XVelocity < 0 {
-			if tank.Y < gamestate.Terrain[int(tank.X)].Y {
-				tank.XVelocity -= (tank.XVelocity / 64)
-			} else {
-				tank.XVelocity += 0.8
-			}
-			if tank.XVelocity > 0 {
-				tank.XVelocity = 0
+			if yDiff > 0 {
+				tank.XVelocity += a
 			}
 			if tank.X > (tank.XVelocity * -1) {
 				tank.X += tank.XVelocity
 			}
 		}
 		if tank.XVelocity > 0 {
-			if tank.Y < gamestate.Terrain[int(tank.X)].Y {
-				tank.XVelocity -= (tank.XVelocity / 64)
-			} else {
-				tank.XVelocity -= 0.8
-			}
-			if tank.XVelocity < 0 {
-				tank.XVelocity = 0
+			if yDiff > 0 {
+				tank.XVelocity -= a
 			}
 			if tank.X < mapSize-(tank.XVelocity) {
 				tank.X += tank.XVelocity
@@ -375,33 +369,29 @@ func handleInput(input string, tank *dataTank, gamestate *gamestate) {
 			y, _ := strconv.Atoi(x) // might not be entirely necessary
 			switch y {
 			case 0:
-				if tank.X < mapSize-(maxVelocity+1) && tank.Y >= gamestate.Terrain[int(tank.X)].Y {
+				if tank.X < mapSize-(maxVelocity+1) {
 					tankLock.Lock()
-					if calculateCollision(tank, gamestate.Tanks) == false {
-						if tank.XVelocity < maxVelocity {
-							if tank.XVelocity < 0 {
-								tank.XVelocity = 0
-							}
-							tank.XVelocity += 1
-							tank.Y = gamestate.Terrain[int(tank.X)].Y
+					if tank.XVelocity < maxVelocity {
+						if tank.XVelocity < 0 {
+							tank.XVelocity = 0
+						} else {
+							tank.XVelocity += 0.8
 						}
 					}
 					tankLock.Unlock()
 				}
 			case 1:
-				if tank.X > 0 && tank.Y >= gamestate.Terrain[int(tank.X)].Y {
+				if tank.X > 0 {
 					tankLock.Lock()
-					if calculateCollision(tank, gamestate.Tanks) == false {
-						if tank.XVelocity > -maxVelocity {
-							if tank.XVelocity > 0 {
-								tank.XVelocity = 0
-							}
-							tank.XVelocity -= 1
-							tank.Y = gamestate.Terrain[int(tank.X)].Y
+					if tank.XVelocity > -maxVelocity {
+						if tank.XVelocity > 0 {
+							tank.XVelocity = 0
+						} else {
+							tank.XVelocity -= 0.8
 						}
 					}
-					tankLock.Unlock()
 				}
+				tankLock.Unlock()
 			case 2:
 				if 0 <= tank.DegCannon && tank.DegCannon < 180 {
 					tankLock.Lock()
