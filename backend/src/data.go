@@ -19,6 +19,7 @@ const maxExplosionDmg int = 50
 const maxVelocity float64 = 5
 const jumpPower float64 = 9 // Bigger number = Bigger jump
 const reactionHeight float64 = 350
+const jumpCooldown int = 100 // amount of frames between jumps
 
 //Gamestate holds all data needed to run the game
 type gamestate struct {
@@ -89,7 +90,8 @@ func initTerrain(game *gamestate) {
 	rand.Seed(time.Now().UnixNano())
 	x := 0
 
-	y := rand.Float64() * heightOfMap
+	y := heightOfMap - rand.Float64()*(heightOfMap/2)
+	fmt.Println(y)
 	//standardTerrain := y
 	var dy float64 = 0
 	var dyGoal float64 = 0
@@ -102,13 +104,16 @@ func initTerrain(game *gamestate) {
 		}
 		dy += dyGoal / 30
 		y += dy
+		if x == 0 {
+			fmt.Println(int(y))
+		}
 		game.Terrain[x] = genTerrain(x, int(y))
 		curveDensity--
 		x++
-		if y > heightOfMap-200 {
+		if y > heightOfMap-250 {
 			dy -= 0.02
 		}
-		if y > heightOfMap-100 {
+		if y > heightOfMap-200 {
 			dyGoal = -0.5
 			dy -= 0.05
 		}
@@ -119,6 +124,12 @@ func initTerrain(game *gamestate) {
 		if y < reactionHeight {
 			dyGoal = 0.5
 			dy += 0.05
+		}
+		if dy >= 0.33 {
+			dy = 0.33
+		}
+		if dy <= -0.33 {
+			dy = -0.33
 		}
 
 	}
@@ -255,7 +266,7 @@ func changeHP(change int, tank *dataTank, gamestate *gamestate) {
 	if tank.Hp <= 0 {
 		tank.Alive = false
 		gamestate.AliveTanks--
-		fmt.Print("tank alive set to false")
+		fmt.Print("tank died")
 	}
 	if tank.Hp > 100 {
 		tank.Hp = 100
@@ -289,6 +300,7 @@ func calculateProjectiles(gamestate *gamestate) {
 }
 
 func tankJump(tank *dataTank, gamestate *gamestate) {
+	tank.LastJump = gamestate.Frame
 	if tank.Y >= gamestate.Terrain[int(tank.X)].Y {
 		tank.YVelocity = -jumpPower
 	}
@@ -403,9 +415,11 @@ func handleInput(input string, tank *dataTank, gamestate *gamestate) {
 					tankLock.Unlock()
 				}
 			case 4: //Jump
-				tankLock.Lock()
-				tankJump(tank, gamestate)
-				tankLock.Unlock()
+				if gamestate.Frame > tank.LastJump+jumpCooldown {
+					tankLock.Lock()
+					tankJump(tank, gamestate)
+					tankLock.Unlock()
+				}
 			case 6:
 				if gamestate.Frame > tank.LastFire+20 {
 					tank.LastFire = gamestate.Frame
@@ -413,7 +427,7 @@ func handleInput(input string, tank *dataTank, gamestate *gamestate) {
 				}
 			case 9:
 				tankLock.Lock()
-				fmt.Println("hp -100?")
+				fmt.Println("suicide initiated")
 				changeHP(-100, tank, gamestate)
 				tankLock.Unlock()
 			// Cases 100+ are only for testing, will not be used in the game!

@@ -25,7 +25,7 @@ explosionsDict = {}
 BUFFER_SIZE = 131072
 clock = pygame.time.Clock()
 winX = 1200
-winY = 700
+winY = 800
 win = pygame.display.set_mode((winX, winY))
 pygame.display.set_caption("Super-Tanks")
 tankCounter = 0
