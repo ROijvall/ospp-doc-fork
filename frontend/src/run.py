@@ -241,9 +241,9 @@ def gameLoop():
             keys = pygame.key.get_pressed()
             str = ""
             if alive:
-                if keys[pygame.K_d]: #drive left
+                if keys[pygame.K_d]: #drive right
                     str += "0,"
-                elif keys[pygame.K_a]: #drive right
+                elif keys[pygame.K_a]: #drive left
                     str += "1,"
                 if keys[pygame.K_w]: #jump
                     str += "4,"
