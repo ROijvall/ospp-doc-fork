@@ -346,17 +346,19 @@ func tanksXMovement(gamestate *gamestate, tanks map[uint32]*dataTank) {
 		} else if tank.XVelocity > 0 {
 			tank.XVelocity -= 0.2
 		}
-		potentialMove := gamestate.Terrain[int(tank.X+tank.XVelocity)].Y // this has to be in bounds
-		yDiff := potentialMove - tank.Y
-		a := yDiff / slopeConst // should range between -0.33-0.33, more speed > larger penalty when climbing a slope
-		if tank.XVelocity < 0 {
-			if yDiff > 0 {
-				tank.XVelocity += a
-			}
-			tank.X += tank.XVelocity
-		} else if tank.XVelocity > 0 {
-			if yDiff > 0 {
-				tank.XVelocity -= a
+		if tank.X+tank.XVelocity > 0 && mapSize > tank.X+tank.XVelocity && tank.XVelocity != 0 {
+			fmt.Println(int(tank.X + tank.XVelocity))
+			potentialMove := gamestate.Terrain[int(tank.X+tank.XVelocity)].Y // this has to be in bounds
+			yDiff := potentialMove - tank.Y
+			a := yDiff / slopeConst // should range between -0.33-0.33, more speed > larger penalty when climbing a slope
+			if tank.XVelocity < 0 {
+				if yDiff > 0 {
+					tank.XVelocity += a
+				}
+			} else if tank.XVelocity > 0 {
+				if yDiff > 0 {
+					tank.XVelocity -= a
+				}
 			}
 			tank.X += tank.XVelocity
 		}
@@ -371,35 +373,32 @@ func handleInput(input string, tank *dataTank, gamestate *gamestate) {
 			y, _ := strconv.Atoi(x) // might not be entirely necessary
 			switch y {
 			case 0: //move right
-				if tank.X < mapSize-(maxVelocity) {
-					tankLock.Lock()
-					if tank.XVelocity < maxVelocity {
-						if tank.XVelocity < 0 {
-							tank.XVelocity = 0
-						} else {
-							tank.XVelocity += 0.8
-						}
-					}
-					tankLock.Unlock()
-				} else {
+				//if tank.X < mapSize-(maxVelocity) {
+				tankLock.Lock()
+				//if tank.XVelocity < maxVelocity {
+				if tank.XVelocity < 0 {
 					tank.XVelocity = 0
+				} else if tank.XVelocity+0.8 > maxVelocity {
+					tank.XVelocity = maxVelocity
+				} else {
+					tank.XVelocity += 0.8
 				}
+				//}
+				tankLock.Unlock()
 			case 1: //move left
-				if tank.X > 0+maxVelocity {
-					tankLock.Lock()
-					if tank.XVelocity > -maxVelocity {
-						if tank.XVelocity > 0 {
-							tank.XVelocity = 0
-						} else {
-							//print("adds negative velocity")
-							tank.XVelocity -= 0.8
-						}
-					}
-					tankLock.Unlock()
-				} else {
+				//if tank.X > 0+maxVelocity {
+				tankLock.Lock()
+				//if tank.XVelocity > -maxVelocity {
+				if tank.XVelocity > 0 {
 					tank.XVelocity = 0
+				} else if tank.XVelocity-0.8 < -maxVelocity {
+					tank.XVelocity = -maxVelocity
+				} else {
+					//print("adds negative velocity")
+					tank.XVelocity -= 0.8
 				}
-
+				//}
+				tankLock.Unlock()
 			case 2:
 				if 0 <= tank.DegCannon && tank.DegCannon < 180 {
 					tankLock.Lock()

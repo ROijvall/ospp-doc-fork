@@ -31,3 +31,7 @@ Either make the screen slightly larger or make tanks slightly smaller to better 
 Write some tests for back-end and investigate how many requests the server can handle (ie is the server able to process 1 request every tick from 4 players, are any sends lost etc)
 
 Try to improve performance in general!
+
+Add tank collision
+
+Game sounds...
