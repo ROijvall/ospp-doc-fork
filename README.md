@@ -1,34 +1,28 @@
 # Super-Tanks (Doc)
 
-Projektarbete på kursen Operativsystem och processorienterad programmering
-(1DT096) våren 2019, Uppsala universitet.
+This is an unofficial fork of a group project from 2019. The goal of the fork is simply to improve upon the original and to learn while doing.
 
-Super-Tanks är ett online 2D multiplayerspel som är baserat på tidigare spel
-som Pocket Tanks och Tanks. Likt tidigare spel så kontrollerar varje spelare
-en stridsvagn som kan röra sig i sidled samt skjuta projektiler som rör sig i
-kastparabler. Om en spelares stridsvagn blir träffad av en projektil så tappar
-stridsvagnen ett liv av tre. Om projektilen bara träffar marken så bildas ett hål
-i terrängen.
+Credit goes to github users: 
+SpriCo
+Tamrannman
+SWallbing
+joelhaile
+ROijvall
 
-Olikt dess föregångare så kommer Super-Tanks spelas i realtid istället för att
-använda ett turbaserat system. Detta blir en utmaning i att utveckla nya banor
-och projektiler som får spelet att kännas balanserat även i realtid.
+Super-Tanks is an online 2D multiplayer game inspired by games like 
+Pocket Tanks and Tanks. Each player controls a tank that can move 
+laterally and shoot parabolic projectiles from an adjustable barrel. 
+If a projectile hits the ground it affects the surrounding terrain. If
+a projectile hits a player they take damage, the goal of the game is to be the last player surviving,
 
-Det här spelet behövs eftersom liknande spel körs via Adobe Flash vilket slu-
-tar stödjas av Adobe i slutet av 2020. Målet är att Super-Tanks ska vara en
-vidareutveckling av dess föregångare, med bättre grafik och modernare spelme-
-kaniker, och även mer lättillgängligt i form av open source utveckling.
+Unlike its predecessors Super-Tanks is played in real time which presents
+additional challenges when it comes to balancing and map creation.
 
-## Bygga projektet
+## Building the project
 
-Kompilering/körning kommandon
-* "make run"................för att bygga och köra programmet.
-
-Test kommandon
-* "make test".................för att köra tester för klient och server.
-
-Rengör kommandon
-* "make clean".................för att städar bort kompilerade filer.
+Currently the makefile is not updated. Golang and python and pygame are currently required to compile and run the project.
+* go build server.go data.go (builds "server.exe" which can be launched)
+* python run.py (launches client side application)
 
 
 ## Katalogstruktur
@@ -62,14 +56,7 @@ Rengör kommandon
 │       ├── run.py
 │       └── tank.py
 ├── makefile
-├── meta
-│   ├── gruppkontrakt.md
-│   ├── images
-│   │   ├── erik.jpg
-│   │   ├── joel.jpg
-│   │   ├── marcus.png
-│   │   ├── rasmus.jpg
-│   │   └── simon.jpg
-│   └── medlemmar.md
 └── README.md
+└── Todo.txt
+└── .gitignore
 </pre>

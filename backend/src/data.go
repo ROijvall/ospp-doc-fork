@@ -16,9 +16,10 @@ const rad2deg float64 = 57.2957795 // Used in calcDeg
 const firePower float64 = 20       // FIXME : Adjust this value to fit gamebalance
 const explosionSize int = 50
 const maxExplosionDmg int = 50
-const maxVelocity float64 = 5
-const jumpPower float64 = 9 // Bigger number = Bigger jump
-const reactionHeight float64 = 350
+const maxVelocity float64 = 4.2    // realistically this is 4 as tanks deaccelerate by 0.2 before they move
+const jumpPower float64 = 9        // Bigger number = Bigger jump
+const reactionHeight float64 = 350 // an y-value used when generating terrain - basically the center of terrain generation
+const jumpCooldown int = 0         // amount of frames between jumps
 
 //Gamestate holds all data needed to run the game
 type gamestate struct {
@@ -59,6 +60,7 @@ type dataTank struct {
 	LastFire  int     `json:"lastfire"`
 	LastJump  int     `json:"lastjump"`
 	Alive     bool    `json:"alive"`
+	InAir     bool    `json:"InAir"`
 }
 
 // dataProjectile holds all data for any given projectile
@@ -89,7 +91,8 @@ func initTerrain(game *gamestate) {
 	rand.Seed(time.Now().UnixNano())
 	x := 0
 
-	y := rand.Float64() * heightOfMap
+	y := heightOfMap - rand.Float64()*(heightOfMap/2) // the height to start at
+	fmt.Println(y)
 	//standardTerrain := y
 	var dy float64 = 0
 	var dyGoal float64 = 0
@@ -102,13 +105,16 @@ func initTerrain(game *gamestate) {
 		}
 		dy += dyGoal / 30
 		y += dy
+		if x == 0 {
+			fmt.Println(int(y))
+		}
 		game.Terrain[x] = genTerrain(x, int(y))
 		curveDensity--
 		x++
-		if y > heightOfMap-200 {
+		if y > heightOfMap-250 {
 			dy -= 0.02
 		}
-		if y > heightOfMap-100 {
+		if y > heightOfMap-200 {
 			dyGoal = -0.5
 			dy -= 0.05
 		}
@@ -120,6 +126,12 @@ func initTerrain(game *gamestate) {
 			dyGoal = 0.5
 			dy += 0.05
 		}
+		if dy >= 0.33 {
+			dy = 0.33
+		}
+		if dy <= -0.33 {
+			dy = -0.33
+		}
 
 	}
 
@@ -128,7 +140,7 @@ func initTerrain(game *gamestate) {
 // calcDegTank will look at a tanks x-value and compare it to the terrain beneath it and then change the tanks gradient
 func calcDegTank(game *gamestate, tank *dataTank) {
 
-	if tank.Y >= game.Terrain[int(tank.X)].Y {
+	if tank.Y >= game.Terrain[int(tank.X)].Y { // possible crash
 		yBefore := float64(0)
 		yAfter := float64(0)
 		if tank.X > 0 && tank.X < mapSize-1 {
@@ -231,7 +243,7 @@ func calculateExplosion(x int, y int, radius int, gamestate *gamestate) {
 	for xCurrent <= xEnd {
 		distFromExp := math.Abs(float64(xCurrent - xMid))
 		yPot := math.Sqrt(float64(-int(distFromExp*distFromExp)+radius*radius)) + float64(y) - 20 // seems to be a good offset
-		if !(int(mapSize) > xCurrent && xCurrent > 0) {
+		if !(int(mapSize) > xCurrent && xCurrent >= 0) {
 
 		} else if gamestate.Terrain[xCurrent].Y < yPot {
 			if yPot < ySave && xCurrent < xMid {
@@ -255,7 +267,7 @@ func changeHP(change int, tank *dataTank, gamestate *gamestate) {
 	if tank.Hp <= 0 {
 		tank.Alive = false
 		gamestate.AliveTanks--
-		fmt.Print("tank alive set to false")
+		fmt.Print("tank died")
 	}
 	if tank.Hp > 100 {
 		tank.Hp = 100
@@ -289,6 +301,8 @@ func calculateProjectiles(gamestate *gamestate) {
 }
 
 func tankJump(tank *dataTank, gamestate *gamestate) {
+	tank.LastJump = gamestate.Frame
+	tank.InAir = true
 	if tank.Y >= gamestate.Terrain[int(tank.X)].Y {
 		tank.YVelocity = -jumpPower
 	}
@@ -296,16 +310,18 @@ func tankJump(tank *dataTank, gamestate *gamestate) {
 
 func tanksJump(gamestate *gamestate) {
 	for _, tank := range gamestate.Tanks {
-		if tank.Y < gamestate.Terrain[int(tank.X)].Y+(tank.YVelocity*-1) {
-			tank.Y = tank.Y + tank.YVelocity
-			tank.YVelocity = tank.YVelocity - g
+		if tank.Y < gamestate.Terrain[int(tank.X)].Y+(tank.YVelocity*-1) { // make sure this cannot go out of bounds
+			tank.Y += tank.YVelocity
+			tank.YVelocity -= g
 
 			if tank.Y > gamestate.Terrain[int(tank.X)].Y {
 				tank.YVelocity = 0
+				tank.InAir = false
 			}
 		} else {
 			tank.Y = gamestate.Terrain[int(tank.X)].Y + 1
 			tank.YVelocity = 0
+			tank.InAir = false
 		}
 	}
 }
@@ -324,33 +340,40 @@ func calculateCollision(playingTank *dataTank, tanks map[uint32]*dataTank) bool 
 	return false
 }
 
-func tanksXVelocity(gamestate *gamestate, tanks map[uint32]*dataTank) {
+func naturalDeacceleration(tanks map[uint32]*dataTank) {
 	for _, tank := range tanks {
-		if tank.XVelocity < 0 {
-			if tank.Y < gamestate.Terrain[int(tank.X)].Y {
-				tank.XVelocity -= (tank.XVelocity / 64)
-			} else {
-				tank.XVelocity += 0.8
-			}
-			if tank.XVelocity > 0 {
+		if !tank.InAir {
+			if tank.XVelocity <= 0.2 && tank.XVelocity >= -0.2 {
 				tank.XVelocity = 0
-			}
-			if tank.X > (tank.XVelocity * -1) {
-				tank.X += tank.XVelocity
+			} else if tank.XVelocity < 0 {
+				tank.XVelocity += 0.2
+			} else if tank.XVelocity > 0 {
+				tank.XVelocity -= 0.2
 			}
 		}
-		if tank.XVelocity > 0 {
-			if tank.Y < gamestate.Terrain[int(tank.X)].Y {
-				tank.XVelocity -= (tank.XVelocity / 64)
-			} else {
-				tank.XVelocity -= 0.8
+	}
+}
+
+func tanksXMovement(gamestate *gamestate, tanks map[uint32]*dataTank) {
+	slopeConst := 3 * maxVelocity // this makes sense because slopes are capped at 0.33 gradient
+	naturalDeacceleration(tanks)
+	for _, tank := range tanks {
+		if tank.X+tank.XVelocity > 0 && mapSize > tank.X+tank.XVelocity && tank.XVelocity != 0 {
+			if !tank.InAir { // if not in air factor in slopes
+				potentialMove := gamestate.Terrain[int(tank.X+tank.XVelocity)].Y // this has to be in bounds, should be covered by first if-condition
+				yDiff := potentialMove - tank.Y
+				a := yDiff / slopeConst // should range between -0.33-0.33 when 0.33 is maxgradient, more speed > larger penalty when climbing a slope
+				if tank.XVelocity < 0 {
+					if yDiff > 0 {
+						tank.XVelocity += a
+					}
+				} else if tank.XVelocity > 0 {
+					if yDiff > 0 {
+						tank.XVelocity -= a
+					}
+				}
 			}
-			if tank.XVelocity < 0 {
-				tank.XVelocity = 0
-			}
-			if tank.X < mapSize-(tank.XVelocity) {
-				tank.X += tank.XVelocity
-			}
+			tank.X += tank.XVelocity
 		}
 	}
 }
@@ -362,34 +385,31 @@ func handleInput(input string, tank *dataTank, gamestate *gamestate) {
 		for _, x := range inputs {
 			y, _ := strconv.Atoi(x) // might not be entirely necessary
 			switch y {
-			case 0:
-				if tank.X < mapSize-(maxVelocity+1) && tank.Y >= gamestate.Terrain[int(tank.X)].Y {
+			case 0: //move right
+				if !tank.InAir {
 					tankLock.Lock()
-					if calculateCollision(tank, gamestate.Tanks) == false {
-						if tank.XVelocity < maxVelocity {
-							if tank.XVelocity < 0 {
-								tank.XVelocity = 0
-							}
-							tank.XVelocity += 1
-							tank.Y = gamestate.Terrain[int(tank.X)].Y
-						}
+					if tank.XVelocity < 0 {
+						tank.XVelocity = 0
+					} else if tank.XVelocity+0.8 > maxVelocity {
+						tank.XVelocity = maxVelocity
+					} else {
+						tank.XVelocity += 0.8
 					}
 					tankLock.Unlock()
 				}
 			case 1:
-				if tank.X > 0 && tank.Y >= gamestate.Terrain[int(tank.X)].Y {
+				if !tank.InAir {
 					tankLock.Lock()
-					if calculateCollision(tank, gamestate.Tanks) == false {
-						if tank.XVelocity > -maxVelocity {
-							if tank.XVelocity > 0 {
-								tank.XVelocity = 0
-							}
-							tank.XVelocity -= 1
-							tank.Y = gamestate.Terrain[int(tank.X)].Y
-						}
+					if tank.XVelocity > 0 {
+						tank.XVelocity = 0
+					} else if tank.XVelocity-0.8 < -maxVelocity {
+						tank.XVelocity = -maxVelocity
+					} else {
+						tank.XVelocity -= 0.8
 					}
 					tankLock.Unlock()
 				}
+
 			case 2:
 				if 0 <= tank.DegCannon && tank.DegCannon < 180 {
 					tankLock.Lock()
@@ -403,9 +423,11 @@ func handleInput(input string, tank *dataTank, gamestate *gamestate) {
 					tankLock.Unlock()
 				}
 			case 4: //Jump
-				tankLock.Lock()
-				tankJump(tank, gamestate)
-				tankLock.Unlock()
+				if gamestate.Frame > tank.LastJump+jumpCooldown {
+					tankLock.Lock()
+					tankJump(tank, gamestate)
+					tankLock.Unlock()
+				}
 			case 6:
 				if gamestate.Frame > tank.LastFire+20 {
 					tank.LastFire = gamestate.Frame
@@ -413,7 +435,7 @@ func handleInput(input string, tank *dataTank, gamestate *gamestate) {
 				}
 			case 9:
 				tankLock.Lock()
-				fmt.Println("hp -100?")
+				fmt.Println("suicide initiated")
 				changeHP(-100, tank, gamestate)
 				tankLock.Unlock()
 			// Cases 100+ are only for testing, will not be used in the game!
