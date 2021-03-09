@@ -19,7 +19,7 @@ const maxExplosionDmg int = 50
 const maxVelocity float64 = 4.2
 const jumpPower float64 = 9 // Bigger number = Bigger jump
 const reactionHeight float64 = 350
-const jumpCooldown int = 100 // amount of frames between jumps
+const jumpCooldown int = 0 // amount of frames between jumps
 
 //Gamestate holds all data needed to run the game
 type gamestate struct {
@@ -60,6 +60,7 @@ type dataTank struct {
 	LastFire  int     `json:"lastfire"`
 	LastJump  int     `json:"lastjump"`
 	Alive     bool    `json:"alive"`
+	InAir     bool    `json:"InAir"`
 }
 
 // dataProjectile holds all data for any given projectile
@@ -139,7 +140,7 @@ func initTerrain(game *gamestate) {
 // calcDegTank will look at a tanks x-value and compare it to the terrain beneath it and then change the tanks gradient
 func calcDegTank(game *gamestate, tank *dataTank) {
 
-	if tank.Y >= game.Terrain[int(tank.X)].Y {
+	if tank.Y >= game.Terrain[int(tank.X)].Y { // possible crash
 		yBefore := float64(0)
 		yAfter := float64(0)
 		if tank.X > 0 && tank.X < mapSize-1 {
@@ -301,6 +302,7 @@ func calculateProjectiles(gamestate *gamestate) {
 
 func tankJump(tank *dataTank, gamestate *gamestate) {
 	tank.LastJump = gamestate.Frame
+	tank.InAir = true
 	if tank.Y >= gamestate.Terrain[int(tank.X)].Y {
 		tank.YVelocity = -jumpPower
 	}
@@ -308,16 +310,18 @@ func tankJump(tank *dataTank, gamestate *gamestate) {
 
 func tanksJump(gamestate *gamestate) {
 	for _, tank := range gamestate.Tanks {
-		if tank.Y < gamestate.Terrain[int(tank.X)].Y+(tank.YVelocity*-1) {
-			tank.Y = tank.Y + tank.YVelocity
-			tank.YVelocity = tank.YVelocity - g
+		if tank.Y < gamestate.Terrain[int(tank.X)].Y+(tank.YVelocity*-1) { // make sure this cannot go out of bounds
+			tank.Y += tank.YVelocity
+			tank.YVelocity -= g
 
 			if tank.Y > gamestate.Terrain[int(tank.X)].Y {
 				tank.YVelocity = 0
+				tank.InAir = false
 			}
 		} else {
 			tank.Y = gamestate.Terrain[int(tank.X)].Y + 1
 			tank.YVelocity = 0
+			tank.InAir = false
 		}
 	}
 }
@@ -336,28 +340,37 @@ func calculateCollision(playingTank *dataTank, tanks map[uint32]*dataTank) bool 
 	return false
 }
 
+func naturalDeacceleration(tanks map[uint32]*dataTank) {
+	for _, tank := range tanks {
+		if !tank.InAir {
+			if tank.XVelocity <= 0.2 && tank.XVelocity >= -0.2 { // natural deacceleration, but what if it never hits 0?
+				tank.XVelocity = 0
+			} else if tank.XVelocity < 0 {
+				tank.XVelocity += 0.2
+			} else if tank.XVelocity > 0 {
+				tank.XVelocity -= 0.2
+			}
+		}
+	}
+}
+
 func tanksXMovement(gamestate *gamestate, tanks map[uint32]*dataTank) {
 	slopeConst := 3 * maxVelocity // this makes sense because slopes are capped at 0.33 gradient
+	naturalDeacceleration(tanks)
 	for _, tank := range tanks {
-		if tank.XVelocity <= 0.2 && tank.XVelocity >= -0.2 { // natural deacceleration, but what if it never hits 0?
-			tank.XVelocity = 0
-		} else if tank.XVelocity < 0 {
-			tank.XVelocity += 0.2
-		} else if tank.XVelocity > 0 {
-			tank.XVelocity -= 0.2
-		}
 		if tank.X+tank.XVelocity > 0 && mapSize > tank.X+tank.XVelocity && tank.XVelocity != 0 {
-			fmt.Println(int(tank.X + tank.XVelocity))
-			potentialMove := gamestate.Terrain[int(tank.X+tank.XVelocity)].Y // this has to be in bounds
-			yDiff := potentialMove - tank.Y
-			a := yDiff / slopeConst // should range between -0.33-0.33, more speed > larger penalty when climbing a slope
-			if tank.XVelocity < 0 {
-				if yDiff > 0 {
-					tank.XVelocity += a
-				}
-			} else if tank.XVelocity > 0 {
-				if yDiff > 0 {
-					tank.XVelocity -= a
+			if !tank.InAir {
+				potentialMove := gamestate.Terrain[int(tank.X+tank.XVelocity)].Y // this has to be in bounds
+				yDiff := potentialMove - tank.Y
+				a := yDiff / slopeConst // should range between -0.33-0.33, more speed > larger penalty when climbing a slope
+				if tank.XVelocity < 0 {
+					if yDiff > 0 {
+						tank.XVelocity += a
+					}
+				} else if tank.XVelocity > 0 {
+					if yDiff > 0 {
+						tank.XVelocity -= a
+					}
 				}
 			}
 			tank.X += tank.XVelocity
@@ -373,32 +386,32 @@ func handleInput(input string, tank *dataTank, gamestate *gamestate) {
 			y, _ := strconv.Atoi(x) // might not be entirely necessary
 			switch y {
 			case 0: //move right
-				//if tank.X < mapSize-(maxVelocity) {
-				tankLock.Lock()
-				//if tank.XVelocity < maxVelocity {
-				if tank.XVelocity < 0 {
-					tank.XVelocity = 0
-				} else if tank.XVelocity+0.8 > maxVelocity {
-					tank.XVelocity = maxVelocity
-				} else {
-					tank.XVelocity += 0.8
+				if !tank.InAir {
+					tankLock.Lock()
+					if tank.XVelocity < 0 {
+						tank.XVelocity = 0
+					} else if tank.XVelocity+0.8 > maxVelocity {
+						tank.XVelocity = maxVelocity
+					} else {
+						tank.XVelocity += 0.8
+					}
+					tankLock.Unlock()
 				}
-				//}
-				tankLock.Unlock()
-			case 1: //move left
-				//if tank.X > 0+maxVelocity {
-				tankLock.Lock()
-				//if tank.XVelocity > -maxVelocity {
-				if tank.XVelocity > 0 {
-					tank.XVelocity = 0
-				} else if tank.XVelocity-0.8 < -maxVelocity {
-					tank.XVelocity = -maxVelocity
-				} else {
-					//print("adds negative velocity")
-					tank.XVelocity -= 0.8
+			case 1:
+				if !tank.InAir {
+					tankLock.Lock()
+					//if tank.XVelocity > -maxVelocity {
+					if tank.XVelocity > 0 {
+						tank.XVelocity = 0
+					} else if tank.XVelocity-0.8 < -maxVelocity {
+						tank.XVelocity = -maxVelocity
+					} else {
+						//print("adds negative velocity")
+						tank.XVelocity -= 0.8
+					}
+					tankLock.Unlock()
 				}
-				//}
-				tankLock.Unlock()
+
 			case 2:
 				if 0 <= tank.DegCannon && tank.DegCannon < 180 {
 					tankLock.Lock()
