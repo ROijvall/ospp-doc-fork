@@ -91,7 +91,7 @@ func initTerrain(game *gamestate) {
 	rand.Seed(time.Now().UnixNano())
 	x := 0
 
-	y := heightOfMap - rand.Float64()*(heightOfMap/2)
+	y := heightOfMap - rand.Float64()*(heightOfMap/2) // the height to start at
 	fmt.Println(y)
 	//standardTerrain := y
 	var dy float64 = 0
@@ -243,7 +243,7 @@ func calculateExplosion(x int, y int, radius int, gamestate *gamestate) {
 	for xCurrent <= xEnd {
 		distFromExp := math.Abs(float64(xCurrent - xMid))
 		yPot := math.Sqrt(float64(-int(distFromExp*distFromExp)+radius*radius)) + float64(y) - 20 // seems to be a good offset
-		if !(int(mapSize) > xCurrent && xCurrent > 0) {
+		if !(int(mapSize) > xCurrent && xCurrent >= 0) {
 
 		} else if gamestate.Terrain[xCurrent].Y < yPot {
 			if yPot < ySave && xCurrent < xMid {
