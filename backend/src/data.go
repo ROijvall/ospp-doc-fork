@@ -16,10 +16,10 @@ const rad2deg float64 = 57.2957795 // Used in calcDeg
 const firePower float64 = 20       // FIXME : Adjust this value to fit gamebalance
 const explosionSize int = 50
 const maxExplosionDmg int = 50
-const maxVelocity float64 = 4.2
-const jumpPower float64 = 9 // Bigger number = Bigger jump
-const reactionHeight float64 = 350
-const jumpCooldown int = 0 // amount of frames between jumps
+const maxVelocity float64 = 4.2    // realistically this is 4 as tanks deaccelerate by 0.2 before they move
+const jumpPower float64 = 9        // Bigger number = Bigger jump
+const reactionHeight float64 = 350 // an y-value used when generating terrain - basically the center of terrain generation
+const jumpCooldown int = 0         // amount of frames between jumps
 
 //Gamestate holds all data needed to run the game
 type gamestate struct {
@@ -343,7 +343,7 @@ func calculateCollision(playingTank *dataTank, tanks map[uint32]*dataTank) bool 
 func naturalDeacceleration(tanks map[uint32]*dataTank) {
 	for _, tank := range tanks {
 		if !tank.InAir {
-			if tank.XVelocity <= 0.2 && tank.XVelocity >= -0.2 { // natural deacceleration, but what if it never hits 0?
+			if tank.XVelocity <= 0.2 && tank.XVelocity >= -0.2 {
 				tank.XVelocity = 0
 			} else if tank.XVelocity < 0 {
 				tank.XVelocity += 0.2
@@ -359,10 +359,10 @@ func tanksXMovement(gamestate *gamestate, tanks map[uint32]*dataTank) {
 	naturalDeacceleration(tanks)
 	for _, tank := range tanks {
 		if tank.X+tank.XVelocity > 0 && mapSize > tank.X+tank.XVelocity && tank.XVelocity != 0 {
-			if !tank.InAir {
-				potentialMove := gamestate.Terrain[int(tank.X+tank.XVelocity)].Y // this has to be in bounds
+			if !tank.InAir { // if not in air factor in slopes
+				potentialMove := gamestate.Terrain[int(tank.X+tank.XVelocity)].Y // this has to be in bounds, should be covered by first if-condition
 				yDiff := potentialMove - tank.Y
-				a := yDiff / slopeConst // should range between -0.33-0.33, more speed > larger penalty when climbing a slope
+				a := yDiff / slopeConst // should range between -0.33-0.33 when 0.33 is maxgradient, more speed > larger penalty when climbing a slope
 				if tank.XVelocity < 0 {
 					if yDiff > 0 {
 						tank.XVelocity += a
@@ -400,13 +400,11 @@ func handleInput(input string, tank *dataTank, gamestate *gamestate) {
 			case 1:
 				if !tank.InAir {
 					tankLock.Lock()
-					//if tank.XVelocity > -maxVelocity {
 					if tank.XVelocity > 0 {
 						tank.XVelocity = 0
 					} else if tank.XVelocity-0.8 < -maxVelocity {
 						tank.XVelocity = -maxVelocity
 					} else {
-						//print("adds negative velocity")
 						tank.XVelocity -= 0.8
 					}
 					tankLock.Unlock()
