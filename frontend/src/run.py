@@ -260,6 +260,8 @@ def gameLoop():
                 if keys[pygame.K_p]:
                     str += "9,"
                     print("sent death")
+                if keys[pygame.K_ESCAPE]:
+                    run = False
             if str != "":
                 str = str.rstrip(',') # remove trailing comma
                 str += "\n" # tells golang channels when the message is done
@@ -278,6 +280,9 @@ def gameLoop():
                 else:
                     print(e)
                     break
+        s.shutdown(socket.SHUT_RDWR)
+        s.close()
+        mainMenu()
 
 mainMenu()
 pygame.quit()
